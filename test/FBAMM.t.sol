@@ -195,4 +195,136 @@ contract FBAMMTest is Test {
 
         assertEq(pool.Qb(), (amount1 - fee1) + (amount2 - fee2));
     }
+
+    // ── Clear tests ─────────────────────────────────────────────────
+
+    function test_clear_balanced() public {
+        vm.prank(alice);
+        pool.addLiquidity(100e18, 100e18);
+
+        vm.prank(alice);
+        pool.swap(address(token0), 10e18); // sell
+
+        vm.prank(bob);
+        pool.swap(address(token1), 10e18); // buy
+
+        vm.roll(block.number + 1);
+
+        address clearer = makeAddr("clearer");
+        vm.prank(clearer);
+        pool.clear();
+
+        // Reserves should be close to original (netted, no AMM interaction)
+        // but LP fees (80% of 30bps) get added to reserves
+        assertGe(pool.reserve0(), 100e18, "reserve0 should include LP fees");
+        assertGe(pool.reserve1(), 100e18, "reserve1 should include LP fees");
+        assertEq(pool.Qb(), 0);
+        assertEq(pool.Qs(), 0);
+
+        // Bob (buyer) should have received token0
+        assertGt(token0.balanceOf(bob), 0, "Bob should receive token0");
+
+        // Clearer should get bounty
+        assertGt(token0.balanceOf(clearer) + token1.balanceOf(clearer), 0, "Clearer gets bounty");
+    }
+
+    function test_clear_unbalanced_moreBuyers() public {
+        vm.prank(alice);
+        pool.addLiquidity(100e18, 100e18);
+
+        vm.prank(bob);
+        pool.swap(address(token1), 20e18); // buy
+
+        vm.prank(alice);
+        pool.swap(address(token0), 10e18); // sell
+
+        vm.roll(block.number + 1);
+
+        uint256 r0Before = pool.reserve0();
+        uint256 r1Before = pool.reserve1();
+
+        address clearer = makeAddr("clearer");
+        vm.prank(clearer);
+        pool.clear();
+
+        assertLt(pool.reserve0(), r0Before, "reserve0 should decrease");
+        assertGt(pool.reserve1(), r1Before, "reserve1 should increase");
+        assertEq(pool.Qb(), 0);
+        assertEq(pool.Qs(), 0);
+    }
+
+    function test_clear_reverts_sameBlock() public {
+        vm.prank(alice);
+        pool.addLiquidity(100e18, 100e18);
+
+        vm.prank(bob);
+        pool.swap(address(token1), 10e18);
+
+        vm.roll(block.number + 1);
+
+        address clearer = makeAddr("clearer");
+        vm.prank(clearer);
+        pool.clear();
+
+        vm.prank(clearer);
+        vm.expectRevert("ALREADY_CLEARED");
+        pool.clear();
+    }
+
+    function test_clear_reverts_emptyBatch() public {
+        vm.prank(alice);
+        pool.addLiquidity(100e18, 100e18);
+
+        vm.roll(block.number + 1);
+
+        address clearer = makeAddr("clearer");
+        vm.prank(clearer);
+        vm.expectRevert("EMPTY_BATCH");
+        pool.clear();
+    }
+
+    function test_clear_tokenConservation() public {
+        vm.prank(alice);
+        pool.addLiquidity(100e18, 100e18);
+
+        address clearer = makeAddr("clearer");
+
+        uint256 totalToken0Before = token0.balanceOf(alice) + token0.balanceOf(bob) + token0.balanceOf(address(pool));
+        uint256 totalToken1Before = token1.balanceOf(alice) + token1.balanceOf(bob) + token1.balanceOf(address(pool));
+
+        vm.prank(bob);
+        pool.swap(address(token1), 10e18);
+
+        vm.prank(alice);
+        pool.swap(address(token0), 5e18);
+
+        vm.roll(block.number + 1);
+
+        vm.prank(clearer);
+        pool.clear();
+
+        uint256 totalToken0After = token0.balanceOf(alice) + token0.balanceOf(bob) + token0.balanceOf(address(pool)) + token0.balanceOf(clearer);
+        uint256 totalToken1After = token1.balanceOf(alice) + token1.balanceOf(bob) + token1.balanceOf(address(pool)) + token1.balanceOf(clearer);
+
+        assertEq(totalToken0After, totalToken0Before, "Token0 not conserved");
+        assertEq(totalToken1After, totalToken1Before, "Token1 not conserved");
+    }
+
+    function test_clear_onlyBuySide() public {
+        vm.prank(alice);
+        pool.addLiquidity(100e18, 100e18);
+
+        vm.prank(bob);
+        pool.swap(address(token1), 10e18);
+
+        vm.roll(block.number + 1);
+
+        address clearer = makeAddr("clearer");
+        vm.prank(clearer);
+        pool.clear();
+
+        assertGt(token0.balanceOf(bob), 0, "Bob should receive token0");
+        assertLt(pool.reserve0(), 100e18, "reserve0 should decrease");
+        assertGt(pool.reserve1(), 100e18, "reserve1 should increase");
+    }
 }

@@ -121,6 +121,88 @@ contract FBAMM is ERC20 {
         }
     }
 
+    // ── Clear (netting + AMM + distribution) ─────────────────────────
+
+    function clear() external {
+        require(lastClearedBlock != block.number, "ALREADY_CLEARED");
+        require(Qb > 0 || Qs > 0, "EMPTY_BATCH");
+
+        lastClearedBlock = block.number;
+
+        uint256 _Qb = Qb;
+        uint256 _Qs = Qs;
+
+        // AMM interaction for net demand
+        uint256 amountOut;
+        if (_Qb > _Qs) {
+            uint256 netDemand = _Qb - _Qs;
+            amountOut = (netDemand * reserve0) / (reserve1 + netDemand);
+            reserve1 += netDemand;
+            reserve0 -= amountOut;
+        } else if (_Qs > _Qb) {
+            uint256 netDemand = _Qs - _Qb;
+            amountOut = (netDemand * reserve1) / (reserve0 + netDemand);
+            reserve0 += netDemand;
+            reserve1 -= amountOut;
+        }
+
+        // Calculate total output for each side
+        uint256 totalToken0ForBuyers;
+        uint256 totalToken1ForSellers;
+
+        if (_Qb >= _Qs) {
+            // Buy excess or balanced
+            totalToken0ForBuyers = _Qs + amountOut; // sellers' token0 + AMM output
+            totalToken1ForSellers = _Qs; // matched portion of buyers' token1
+        } else {
+            // Sell excess
+            totalToken0ForBuyers = _Qb; // matched portion of sellers' token0
+            totalToken1ForSellers = _Qb + amountOut; // buyers' token1 + AMM output
+        }
+
+        // Distribute to buyers (they receive token0)
+        if (_Qb > 0) {
+            for (uint256 i = 0; i < batchBuyers.length; i++) {
+                address buyer = batchBuyers[i];
+                uint256 share = batchBuyOrders[buyer];
+                uint256 payout = (share * totalToken0ForBuyers) / _Qb;
+                if (payout > 0) IERC20(token0).transfer(buyer, payout);
+                delete batchBuyOrders[buyer];
+            }
+        }
+
+        // Distribute to sellers (they receive token1)
+        if (_Qs > 0) {
+            for (uint256 i = 0; i < batchSellers.length; i++) {
+                address seller = batchSellers[i];
+                uint256 share = batchSellOrders[seller];
+                uint256 payout = (share * totalToken1ForSellers) / _Qs;
+                if (payout > 0) IERC20(token1).transfer(seller, payout);
+                delete batchSellOrders[seller];
+            }
+        }
+
+        // Fee distribution: 80% to LP reserves, 20% to clearer
+        uint256 lpFee0 = (pendingFees0 * LP_FEE_SHARE) / 100;
+        uint256 lpFee1 = (pendingFees1 * LP_FEE_SHARE) / 100;
+        uint256 clearerFee0 = pendingFees0 - lpFee0;
+        uint256 clearerFee1 = pendingFees1 - lpFee1;
+
+        reserve0 += lpFee0;
+        reserve1 += lpFee1;
+
+        if (clearerFee0 > 0) IERC20(token0).transfer(msg.sender, clearerFee0);
+        if (clearerFee1 > 0) IERC20(token1).transfer(msg.sender, clearerFee1);
+
+        // Reset batch state
+        Qb = 0;
+        Qs = 0;
+        pendingFees0 = 0;
+        pendingFees1 = 0;
+        delete batchBuyers;
+        delete batchSellers;
+    }
+
     // ── Internal helpers ────────────────────────────────────────────
 
     function _sqrt(uint256 y) internal pure returns (uint256 z) {
