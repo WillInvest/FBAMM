@@ -202,11 +202,15 @@ contract FBAMMTest is Test {
         vm.prank(alice);
         pool.addLiquidity(100e18, 100e18);
 
+        uint256 swapAmount = 10e18;
+        uint256 fee = (swapAmount * 30) / 10000; // 0.03e18
+        uint256 netAmount = swapAmount - fee; // 9.97e18
+
         vm.prank(alice);
-        pool.swap(address(token0), 10e18); // sell
+        pool.swap(address(token0), swapAmount); // sell
 
         vm.prank(bob);
-        pool.swap(address(token1), 10e18); // buy
+        pool.swap(address(token1), swapAmount); // buy
 
         vm.roll(block.number + 1);
 
@@ -214,43 +218,71 @@ contract FBAMMTest is Test {
         vm.prank(clearer);
         pool.clear();
 
-        // Reserves should be close to original (netted, no AMM interaction)
-        // but LP fees (80% of 30bps) get added to reserves
-        assertGe(pool.reserve0(), 100e18, "reserve0 should include LP fees");
-        assertGe(pool.reserve1(), 100e18, "reserve1 should include LP fees");
+        // Balanced: Qb == Qs, no AMM interaction, pure netting
+        // LP fees: 80% of fee added to reserves
+        uint256 lpFee0 = (fee * 80) / 100;
+        uint256 lpFee1 = (fee * 80) / 100;
+        assertEq(pool.reserve0(), 100e18 + lpFee0, "reserve0 should increase by LP fee");
+        assertEq(pool.reserve1(), 100e18 + lpFee1, "reserve1 should increase by LP fee");
         assertEq(pool.Qb(), 0);
         assertEq(pool.Qs(), 0);
 
-        // Bob (buyer) should have received token0
-        assertGt(token0.balanceOf(bob), 0, "Bob should receive token0");
+        // Bob (buyer) deposited netAmount token1, gets netAmount token0 (1:1 balanced netting)
+        assertEq(token0.balanceOf(bob), 1000e18 + netAmount, "Bob should receive exact netAmount token0");
 
-        // Clearer should get bounty
-        assertGt(token0.balanceOf(clearer) + token1.balanceOf(clearer), 0, "Clearer gets bounty");
+        // Clearer gets 20% of fees in both tokens
+        uint256 clearerFee0 = fee - lpFee0;
+        uint256 clearerFee1 = fee - lpFee1;
+        assertEq(token0.balanceOf(clearer), clearerFee0, "Clearer token0 bounty");
+        assertEq(token1.balanceOf(clearer), clearerFee1, "Clearer token1 bounty");
     }
 
     function test_clear_unbalanced_moreBuyers() public {
         vm.prank(alice);
         pool.addLiquidity(100e18, 100e18);
 
+        uint256 buyAmount = 20e18;
+        uint256 sellAmount = 10e18;
+        uint256 buyFee = (buyAmount * 30) / 10000;
+        uint256 sellFee = (sellAmount * 30) / 10000;
+        uint256 netBuy = buyAmount - buyFee;  // Qb
+        uint256 netSell = sellAmount - sellFee;  // Qs
+
         vm.prank(bob);
-        pool.swap(address(token1), 20e18); // buy
+        pool.swap(address(token1), buyAmount); // buy
+
+        uint256 aliceToken1Before = token1.balanceOf(alice);
 
         vm.prank(alice);
-        pool.swap(address(token0), 10e18); // sell
+        pool.swap(address(token0), sellAmount); // sell
 
         vm.roll(block.number + 1);
 
-        uint256 r0Before = pool.reserve0();
-        uint256 r1Before = pool.reserve1();
+        // Calculate expected AMM interaction
+        uint256 netDemand = netBuy - netSell; // excess buy
+        uint256 amountOut = (netDemand * 100e18) / (100e18 + netDemand); // token0 from AMM
+        uint256 expectedR0 = 100e18 - amountOut;
+        uint256 expectedR1 = 100e18 + netDemand;
 
         address clearer = makeAddr("clearer");
         vm.prank(clearer);
         pool.clear();
 
-        assertLt(pool.reserve0(), r0Before, "reserve0 should decrease");
-        assertGt(pool.reserve1(), r1Before, "reserve1 should increase");
+        // Verify exact reserve changes (before LP fees)
+        uint256 lpFee0 = (sellFee * 80) / 100;
+        uint256 lpFee1 = (buyFee * 80) / 100;
+        assertEq(pool.reserve0(), expectedR0 + lpFee0, "reserve0 exact");
+        assertEq(pool.reserve1(), expectedR1 + lpFee1, "reserve1 exact");
         assertEq(pool.Qb(), 0);
         assertEq(pool.Qs(), 0);
+
+        // Alice (seller) should receive token1
+        uint256 totalToken1ForSellers = netSell; // balanced portion from buyers
+        assertEq(token1.balanceOf(alice), aliceToken1Before + totalToken1ForSellers, "Alice should receive exact token1");
+
+        // Bob (buyer) should receive proportional token0
+        uint256 totalToken0ForBuyers = netSell + amountOut;
+        assertEq(token0.balanceOf(bob), 1000e18 + totalToken0ForBuyers, "Bob should receive exact token0");
     }
 
     function test_clear_reverts_sameBlock() public {
@@ -314,8 +346,63 @@ contract FBAMMTest is Test {
         vm.prank(alice);
         pool.addLiquidity(100e18, 100e18);
 
+        uint256 swapAmount = 10e18;
+        uint256 fee = (swapAmount * 30) / 10000;
+        uint256 netAmount = swapAmount - fee; // Qb, no Qs
+
         vm.prank(bob);
-        pool.swap(address(token1), 10e18);
+        pool.swap(address(token1), swapAmount);
+
+        vm.roll(block.number + 1);
+
+        // All goes through AMM: amountOut = (netAmount * reserve0) / (reserve1 + netAmount)
+        uint256 amountOut = (netAmount * 100e18) / (100e18 + netAmount);
+        uint256 lpFee1 = (fee * 80) / 100;
+
+        address clearer = makeAddr("clearer");
+        vm.prank(clearer);
+        pool.clear();
+
+        assertEq(token0.balanceOf(bob), 1000e18 + amountOut, "Bob should receive exact AMM output");
+        assertEq(pool.reserve0(), 100e18 - amountOut, "reserve0 exact");
+        assertEq(pool.reserve1(), 100e18 + netAmount + lpFee1, "reserve1 exact");
+    }
+
+    function test_clear_onlySellSide() public {
+        vm.prank(alice);
+        pool.addLiquidity(100e18, 100e18);
+
+        uint256 swapAmount = 10e18;
+        uint256 fee = (swapAmount * 30) / 10000;
+        uint256 netAmount = swapAmount - fee; // Qs, no Qb
+
+        vm.prank(bob);
+        pool.swap(address(token0), swapAmount);
+
+        vm.roll(block.number + 1);
+
+        // All goes through AMM: amountOut = (netAmount * reserve1) / (reserve0 + netAmount)
+        uint256 amountOut = (netAmount * 100e18) / (100e18 + netAmount);
+        uint256 lpFee0 = (fee * 80) / 100;
+
+        address clearer = makeAddr("clearer");
+        vm.prank(clearer);
+        pool.clear();
+
+        assertEq(token1.balanceOf(bob), 1000e18 + amountOut, "Bob should receive exact AMM output");
+        assertEq(pool.reserve1(), 100e18 - amountOut, "reserve1 exact");
+        assertEq(pool.reserve0(), 100e18 + netAmount + lpFee0, "reserve0 exact");
+    }
+
+    function test_clear_exactFeeSplit() public {
+        vm.prank(alice);
+        pool.addLiquidity(100e18, 100e18);
+
+        uint256 swapAmount = 10e18;
+        uint256 fee = (swapAmount * 30) / 10000;
+
+        vm.prank(bob);
+        pool.swap(address(token1), swapAmount);
 
         vm.roll(block.number + 1);
 
@@ -323,8 +410,12 @@ contract FBAMMTest is Test {
         vm.prank(clearer);
         pool.clear();
 
-        assertGt(token0.balanceOf(bob), 0, "Bob should receive token0");
-        assertLt(pool.reserve0(), 100e18, "reserve0 should decrease");
-        assertGt(pool.reserve1(), 100e18, "reserve1 should increase");
+        // 80% of fee to LP reserves, 20% to clearer
+        uint256 lpFee = (fee * 80) / 100;
+        uint256 clearerFee = fee - lpFee;
+
+        // reserve1 should include netAmount (AMM) + lpFee
+        // Clearer should get exactly 20% of fee
+        assertEq(token1.balanceOf(clearer), clearerFee, "Clearer gets exactly 20% of fee");
     }
 }
