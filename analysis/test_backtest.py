@@ -75,7 +75,9 @@ def test_unbalanced_buy_heavy():
     net_buy = buy_amount - buy_fee
     net_sell = sell_amount - sell_fee
 
-    net_demand = net_buy - net_sell
+    # With cross-decimal netting: matched_token1 = (Qs * r1) / r0 = Qs (when r0 == r1)
+    matched_token1 = (net_sell * r1) // r0  # = net_sell when r0 == r1
+    net_demand = net_buy - matched_token1
     amm_out = (net_demand * r0) // (r1 + net_demand)
 
     assert result is not None
@@ -84,8 +86,50 @@ def test_unbalanced_buy_heavy():
     assert 0 < result["netting_ratio"] < 1
     assert result["amount_out_from_amm"] == amm_out
     assert result["total_token0_for_buyers"] == net_sell + amm_out
-    assert result["total_token1_for_sellers"] == net_sell  # sellers get matched portion
+    assert result["total_token1_for_sellers"] == matched_token1
     print(f"  Unbalanced buy-heavy: OK (netting={result['netting_ratio']:.2%}, amm_out={amm_out})")
+
+
+def test_cross_decimal():
+    """Test with different decimals: WETH (18) vs USDC (6)."""
+    # 1000 WETH, 2M USDC → spot price = 2000 USDC/WETH
+    r0 = 1000 * 10**18       # 1000 WETH
+    r1 = 2_000_000 * 10**6   # 2M USDC
+
+    # Buyer: buy ETH with 4000 USDC
+    # Seller: sell 1 ETH
+    swaps = [
+        {"amount0In": "0", "amount1In": str(4000 * 10**6), "amount0Out": "0", "amount1Out": "0"},
+        {"amount0In": str(1 * 10**18), "amount1In": "0", "amount0Out": "0", "amount1Out": "0"},
+    ]
+
+    result = simulate_fbamm_block(r0, r1, swaps)
+
+    buy_fee = (4000 * 10**6 * 30) // 10000
+    sell_fee = (1 * 10**18 * 30) // 10000
+    net_buy = 4000 * 10**6 - buy_fee    # ~3988e6 USDC
+    net_sell = 1 * 10**18 - sell_fee     # ~0.997e18 WETH
+
+    assert result is not None
+
+    # Buy excess: net_buy * r0 vs net_sell * r1
+    # 3988e6 * 1000e18 vs 997e15 * 2e9 → compare economic values
+    buy_value = net_buy * r0
+    sell_value = net_sell * r1
+    assert buy_value > sell_value, "Should be buy excess (4000 USDC > 1 ETH at 2000)"
+
+    # matched_token1 = (Qs * r1) / r0 = (net_sell * 2e9) / 1e18 * 1e6 ≈ 1994 USDC
+    matched = (net_sell * r1) // r0
+    assert matched > 0, f"Matched should be > 0: {matched}"
+
+    # Seller should get ~1994 USDC (spot value of 1 ETH minus fee)
+    assert result["total_token1_for_sellers"] == matched
+    assert result["total_token0_for_buyers"] > 0
+
+    # Netting ratio should be meaningful (not 0 or near 0)
+    assert result["netting_ratio"] > 0.3, f"Netting ratio too low: {result['netting_ratio']}"
+
+    print(f"  Cross-decimal: OK (netting={result['netting_ratio']:.2%}, seller_gets={matched} USDC, buyer_gets={result['total_token0_for_buyers']} WETH)")
 
 
 def test_constant_product():
@@ -102,4 +146,5 @@ if __name__ == "__main__":
     test_single_buyer()
     test_balanced()
     test_unbalanced_buy_heavy()
+    test_cross_decimal()
     print("\nAll tests passed!")

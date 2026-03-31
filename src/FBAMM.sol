@@ -129,35 +129,49 @@ contract FBAMM is ERC20 {
 
         lastClearedBlock = block.number;
 
-        uint256 _Qb = Qb;
-        uint256 _Qs = Qs;
+        uint256 _Qb = Qb; // token1 deposited by buyers
+        uint256 _Qs = Qs; // token0 deposited by sellers
+        uint256 _r0 = reserve0;
+        uint256 _r1 = reserve1;
 
-        // AMM interaction for net demand
+        // Determine net direction using cross-multiplication to handle
+        // different token decimals: compare Qb/r1 vs Qs/r0 → Qb*r0 vs Qs*r1
+        bool buyExcess = _Qb * _r0 >= _Qs * _r1;
+
         uint256 amountOut;
-        if (_Qb > _Qs) {
-            uint256 netDemand = _Qb - _Qs;
-            amountOut = (netDemand * reserve0) / (reserve1 + netDemand);
-            reserve1 += netDemand;
-            reserve0 -= amountOut;
-        } else if (_Qs > _Qb) {
-            uint256 netDemand = _Qs - _Qb;
-            amountOut = (netDemand * reserve1) / (reserve0 + netDemand);
-            reserve0 += netDemand;
-            reserve1 -= amountOut;
-        }
-
-        // Calculate total output for each side
         uint256 totalToken0ForBuyers;
         uint256 totalToken1ForSellers;
 
-        if (_Qb >= _Qs) {
-            // Buy excess or balanced
-            totalToken0ForBuyers = _Qs + amountOut; // sellers' token0 + AMM output
-            totalToken1ForSellers = _Qs; // matched portion of buyers' token1
+        if (buyExcess) {
+            // Buyers' token1 has more economic value than sellers' token0.
+            // Net: sellers' Qs token0 is matched against (Qs * r1 / r0) token1 from buyers.
+            // Remainder: Qb - (Qs * r1 / r0) token1 goes through AMM for more token0.
+            uint256 matchedToken1 = (_Qs * _r1) / _r0;
+            uint256 netDemand = _Qb - matchedToken1; // excess token1 → AMM
+
+            if (netDemand > 0) {
+                amountOut = (netDemand * _r0) / (_r1 + netDemand);
+                reserve1 += netDemand;
+                reserve0 -= amountOut;
+            }
+
+            totalToken0ForBuyers = _Qs + amountOut; // from sellers + AMM
+            totalToken1ForSellers = matchedToken1;   // from buyers (at spot price)
         } else {
-            // Sell excess
-            totalToken0ForBuyers = _Qb; // matched portion of sellers' token0
-            totalToken1ForSellers = _Qb + amountOut; // buyers' token1 + AMM output
+            // Sellers' token0 has more economic value than buyers' token1.
+            // Net: buyers' Qb token1 is matched against (Qb * r0 / r1) token0 from sellers.
+            // Remainder: Qs - (Qb * r0 / r1) token0 goes through AMM for more token1.
+            uint256 matchedToken0 = (_Qb * _r0) / _r1;
+            uint256 netDemand = _Qs - matchedToken0; // excess token0 → AMM
+
+            if (netDemand > 0) {
+                amountOut = (netDemand * _r1) / (_r0 + netDemand);
+                reserve0 += netDemand;
+                reserve1 -= amountOut;
+            }
+
+            totalToken0ForBuyers = matchedToken0;      // from sellers (at spot price)
+            totalToken1ForSellers = _Qb + amountOut;   // from buyers + AMM
         }
 
         // Distribute to buyers (they receive token0)

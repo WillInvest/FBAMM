@@ -62,27 +62,30 @@ def simulate_fbamm_block(reserve0, reserve1, swaps):
     if Qb == 0 and Qs == 0:
         return None
 
-    # Clearing
+    # Clearing — use cross-multiplication for correct cross-decimal netting
     amount_out = 0
     r0, r1 = reserve0, reserve1
 
-    if Qb > Qs:
-        net_demand = Qb - Qs
-        amount_out = (net_demand * r0) // (r1 + net_demand)
-        r1 += net_demand
-        r0 -= amount_out
-    elif Qs > Qb:
-        net_demand = Qs - Qb
-        amount_out = (net_demand * r1) // (r0 + net_demand)
-        r0 += net_demand
-        r1 -= amount_out
+    # Compare economic value: Qb*r0 vs Qs*r1 (cross-multiply to avoid division)
+    buy_excess = Qb * r0 >= Qs * r1
 
-    # Distribution totals
-    if Qb >= Qs:
+    if buy_excess:
+        matched_token1 = (Qs * r1) // r0  # token1 matched at spot price
+        net_demand = Qb - matched_token1   # excess token1 → AMM
+        if net_demand > 0:
+            amount_out = (net_demand * r0) // (r1 + net_demand)
+            r1 += net_demand
+            r0 -= amount_out
         total_token0_for_buyers = Qs + amount_out
-        total_token1_for_sellers = Qs  # matched from buyers
+        total_token1_for_sellers = matched_token1
     else:
-        total_token0_for_buyers = Qb  # matched from sellers
+        matched_token0 = (Qb * r0) // r1  # token0 matched at spot price
+        net_demand = Qs - matched_token0   # excess token0 → AMM
+        if net_demand > 0:
+            amount_out = (net_demand * r1) // (r0 + net_demand)
+            r0 += net_demand
+            r1 -= amount_out
+        total_token0_for_buyers = matched_token0
         total_token1_for_sellers = Qb + amount_out
 
     # Unified prices (what each side gets per unit deposited)
@@ -95,10 +98,13 @@ def simulate_fbamm_block(reserve0, reserve1, swaps):
     r0 += lp_fee0
     r1 += lp_fee1
 
-    # Netting ratio
-    netted = min(Qb, Qs)
-    total = max(Qb, Qs)
-    netting_ratio = netted / total if total > 0 else 0
+    # Netting ratio — compare in token0 terms using spot price
+    # Buy demand in token0: Qb * r0_orig / r1_orig
+    # Sell supply in token0: Qs
+    buy_as_token0 = (Qb * reserve0) // reserve1 if reserve1 > 0 else 0
+    netted_token0 = min(buy_as_token0, Qs)
+    total_token0 = max(buy_as_token0, Qs)
+    netting_ratio = netted_token0 / total_token0 if total_token0 > 0 else 0
 
     return {
         "Qb": Qb,
