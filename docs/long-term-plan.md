@@ -7,29 +7,42 @@
 
 ## Current Status
 
-Phase 1 complete. Core contract, test suite, and backtest infrastructure all built. Cross-decimal netting fixed. Python simulation validated against Solidity contract (exact match). Ready for first real backtest once RPC key is configured.
+Phase 2: Agent simulation and analysis. Core contract built. ZI trader + arbitrageur + CEX (GBM) simulation running. First results show an unexpected finding that needs investigation.
+
+## IMPORTANT FINDING (2026-03-31)
+
+**FBAMM does NOT reduce arbitrageur profits (LVR) vs UniswapV2.** In simulation, the arb actually extracts MORE from FBAMM ($160K) than UniV2 ($138K) because the batch clearing gives the arb a better unified price when ZI traders on the same side amplify the correction.
+
+**FBAMM's confirmed advantage is execution quality** — unified pricing eliminates within-block price variance ($11.53 avg spread → $0). The netting efficiency is also real (25-41% avg).
+
+**This finding needs deeper analysis:** Is the arb model correct? Does the arb's information advantage (seeing reserves before batch) invalidate the MEV protection claim? How does this compare to the FM-AMM paper (Canidio & Fritsch 2023)?
 
 ## Priority Backlog
 
-### High Priority (Next Session)
-- [ ] Set up RPC key (dRPC or Alchemy) in .env
-- [ ] Run first backtest on ETH/USDC (100 blocks) — validate entire pipeline end-to-end
-- [ ] Implement full Anvil-based per-block replay (Python orchestrator using cast send/call)
-- [ ] Compare FBAMM unified price vs Uniswap V2 per-trade prices with real data
+### Critical (Address the LVR Finding)
+- [ ] Analyze WHY FBAMM arb profits are higher — is this a simulation artifact or real?
+- [ ] Re-read Canidio & Fritsch (2023) FM-AMM paper — how do they handle arb in batch?
+- [ ] Consider: should arb submit BEFORE ZI traders (realistic: arb sees mempool) vs AFTER?
+- [ ] Consider: does FBAMM need a commit-reveal scheme to truly protect against MEV?
+- [ ] Run sensitivity analysis: vary sigma, arrival_rate, arb_max_size
+
+### High Priority
+- [ ] Run backtest on real ETH/USDC data (already working — data fetched)
+- [ ] Expand to ETH/USDT and ETH/WBTC pools
+- [ ] Implement LP return comparison (fee income - impermanent loss) over time series
+- [ ] Add MEV/sandwich bot agent to simulation
 
 ### Medium Priority
-- [ ] Expand backtest to ETH/USDT and ETH/WBTC pools
-- [ ] Implement LP return comparison (fee income - impermanent loss)
 - [ ] Fetch MEV data from Flashbots/EigenPhi for quantification
 - [ ] Gas optimization for clear() if benchmarks show issues
-- [ ] Add netting efficiency analysis across different pool types
+- [ ] Netting efficiency analysis across different pool types and volatility regimes
+- [ ] Test different fee splits (70/30, 90/10) and compare LP returns
 
 ### Low Priority (Paper)
 - [ ] Write Introduction and Related Work sections
-- [ ] Formalize MEV elimination theorem (mathematical proof)
+- [ ] Formalize MEV elimination theorem (unified pricing proof)
 - [ ] Create per-block comparison methodology diagram
-- [ ] Expand to 10,000+ block sample for statistical significance
-- [ ] Identify and add high-MEV token pairs
+- [ ] Expand simulation to 10,000+ blocks for statistical significance
 - [ ] Sepolia testnet deployment
 - [ ] LaTeX paper skeleton
 
@@ -39,35 +52,34 @@ Phase 1 complete. Core contract, test suite, and backtest infrastructure all bui
 - [2026-03-31] Implementation plan created (10 tasks)
 - [2026-03-31] Foundry project setup (forge, OpenZeppelin, MockERC20)
 - [2026-03-31] FBAMM.sol core: addLiquidity, removeLiquidity, swap, clear
-- [2026-03-31] Test suite: 32 tests (unit, fuzz 256 runs, invariant 128K calls, gas benchmarks)
-- [2026-03-31] Backtest pipeline: fetch_swaps.py + backtest.py + aggregate.py + plot.py
-- [2026-03-31] Fixed cross-decimal netting bug (Qb*r0 vs Qs*r1 comparison)
-- [2026-03-31] Cross-validation: Python simulation matches Solidity contract exactly
-- [2026-03-31] Integration tests: multi-trader scenarios with UniV2 comparison
-- [2026-03-31] Strengthened test assertions: exact value checks for clear() payouts and fees
-- [2026-03-31] GitHub repo: https://github.com/WillInvest/FBAMM.git
-- [2026-03-31] Cron job configured for autonomous development loop
+- [2026-03-31] 32 Solidity tests (unit, fuzz, invariant, gas, integration, cross-val)
+- [2026-03-31] Fixed cross-decimal netting bug
+- [2026-03-31] Backtest pipeline working end-to-end with real Uniswap V2 data
+- [2026-03-31] First real backtest: ETH/USDC 2022 data shows 13% avg netting
+- [2026-03-31] ZI trader simulation: 41% netting at λ=5, scales to 65% at λ=20
+- [2026-03-31] CEX GBM + arbitrageur agent added
+- [2026-03-31] KEY FINDING: FBAMM does not reduce LVR — arb profits same or higher
+- [2026-03-31] GitHub: https://github.com/WillInvest/FBAMM.git
+- [2026-03-31] Cron job: every 3h on Anthropic cloud
 
 ## Session Log
 
 ### Session 1 (2026-03-31)
-- Created design spec and implementation plan
-- Implemented full FBAMM contract with TDD (10 tasks, all complete)
-- Built backtest and analysis pipeline
-- Discovered and fixed cross-decimal netting bug
-- Cross-validated Python backtest against Solidity (exact match)
-- Pushed to GitHub, set up cron for autonomous loop
-- **Suggestion for next session:** Run first backtest on ETH/USDC. If RPC key is available in .env, run `python3 analysis/fetch_swaps.py ETH_USDC 19000000 19000100` then `python3 analysis/backtest.py data/ETH_USDC_19000000_19000100.json`. If no RPC key, focus on: (1) writing the MEV elimination theorem proof, (2) expanding the Anvil integration to use cast for on-chain verification, (3) starting the paper's Introduction section.
+- Built entire project from scratch: contract, tests, backtest, simulation
+- ZI trader results: strong execution quality improvement, good netting
+- Added CEX GBM + arbitrageur: discovered FBAMM doesn't reduce LVR
+- **Key insight:** FBAMM's value proposition may be execution quality (unified price), not LP protection. This shapes the paper's narrative.
+- **Suggestion for next session:** The LVR finding is the most important thing to investigate. Read the FM-AMM paper to understand how they handle this. Consider whether the arb's timing (seeing reserves before batch) is realistic. Try different arb orderings in the simulation.
 
 ## Open Questions
+- Does FBAMM truly protect against MEV, or only against within-block price variance?
+- How does FM-AMM (Canidio & Fritsch) solve the arb-in-batch problem?
+- Should FBAMM use commit-reveal to hide order flow until clearing?
+- Is the 80/20 fee split optimal? Does the clearing bounty need to be dynamic?
 - What block range gives the best mix of high/low volatility for the paper?
-- Should we compare against Uniswap V3 as well, or keep scope to V2?
-- What's the optimal fee split (80/20) or should we test multiple splits?
-- How does netting ratio vary across pool types (major vs small-cap)?
 
 ## Ideas
-- Test different fee splits (70/30, 90/10) and compare LP returns
-- Analyze netting ratio as a function of block activity — does it scale?
-- Compare gas overhead of FBAMM vs direct swap + MEV cost (break-even analysis)
-- Formal game-theoretic analysis of clearing bounty mechanism
-- Multi-block simulation with persistent state to measure long-term LP returns
+- Commit-reveal scheme: traders submit hash of order, reveal after batch close
+- Time-weighted batch clearing: weight orders by how early they were submitted
+- Multi-block arb analysis: does FBAMM reduce arb profitability over multiple blocks?
+- Compare FBAMM against FM-AMM (CoW AMM) directly in simulation
