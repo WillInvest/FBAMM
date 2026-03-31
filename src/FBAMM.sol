@@ -90,6 +90,37 @@ contract FBAMM is ERC20 {
         IERC20(token1).transfer(msg.sender, amount1);
     }
 
+    // ── Swap (batch queuing) ──────────────────────────────────────────
+
+    function swap(address tokenIn, uint256 amountIn) external {
+        require(tokenIn == token0 || tokenIn == token1, "invalid token");
+        require(amountIn > 0, "zero amount");
+        require(reserve0 > 0 && reserve1 > 0, "no liquidity");
+
+        IERC20(tokenIn).transferFrom(msg.sender, address(this), amountIn);
+
+        uint256 fee = (amountIn * FEE_BPS) / 10000;
+        uint256 netAmount = amountIn - fee;
+
+        if (tokenIn == token1) {
+            // Buying token0 with token1
+            pendingFees1 += fee;
+            Qb += netAmount;
+            if (batchBuyOrders[msg.sender] == 0) {
+                batchBuyers.push(msg.sender);
+            }
+            batchBuyOrders[msg.sender] += netAmount;
+        } else {
+            // Selling token0 for token1
+            pendingFees0 += fee;
+            Qs += netAmount;
+            if (batchSellOrders[msg.sender] == 0) {
+                batchSellers.push(msg.sender);
+            }
+            batchSellOrders[msg.sender] += netAmount;
+        }
+    }
+
     // ── Internal helpers ────────────────────────────────────────────
 
     function _sqrt(uint256 y) internal pure returns (uint256 z) {

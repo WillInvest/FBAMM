@@ -128,4 +128,71 @@ contract FBAMMTest is Test {
         assertEq(token0.balanceOf(alice), 1000e18 - MINIMUM_LIQUIDITY, "alice token0 after remove");
         assertEq(token1.balanceOf(alice), 1000e18 - MINIMUM_LIQUIDITY, "alice token1 after remove");
     }
+
+    // ── Swap tests ──────────────────────────────────────────────────
+
+    function test_swap_buyToken0() public {
+        vm.prank(alice);
+        pool.addLiquidity(100e18, 100e18);
+
+        uint256 swapAmount = 10e18;
+        uint256 fee = (swapAmount * 30) / 10000;
+        uint256 netAmount = swapAmount - fee;
+
+        vm.prank(bob);
+        pool.swap(address(token1), swapAmount);
+
+        assertEq(pool.Qb(), netAmount, "Qb should increase by net amount");
+        assertEq(pool.Qs(), 0, "Qs should be unchanged");
+        assertEq(pool.batchBuyOrders(bob), netAmount);
+        assertEq(pool.reserve0(), 100e18);
+        assertEq(pool.reserve1(), 100e18);
+    }
+
+    function test_swap_sellToken0() public {
+        vm.prank(alice);
+        pool.addLiquidity(100e18, 100e18);
+
+        uint256 swapAmount = 10e18;
+        uint256 fee = (swapAmount * 30) / 10000;
+        uint256 netAmount = swapAmount - fee;
+
+        vm.prank(bob);
+        pool.swap(address(token0), swapAmount);
+
+        assertEq(pool.Qs(), netAmount, "Qs should increase by net amount");
+        assertEq(pool.Qb(), 0, "Qb should be unchanged");
+        assertEq(pool.batchSellOrders(bob), netAmount);
+    }
+
+    function test_swap_feeAccumulation() public {
+        vm.prank(alice);
+        pool.addLiquidity(100e18, 100e18);
+
+        uint256 swapAmount = 10e18;
+        uint256 fee = (swapAmount * 30) / 10000;
+
+        vm.prank(bob);
+        pool.swap(address(token1), swapAmount);
+
+        assertEq(pool.pendingFees1(), fee, "Pending fees should accumulate");
+    }
+
+    function test_swap_multipleTraders() public {
+        vm.prank(alice);
+        pool.addLiquidity(100e18, 100e18);
+
+        uint256 amount1 = 10e18;
+        uint256 amount2 = 5e18;
+        uint256 fee1 = (amount1 * 30) / 10000;
+        uint256 fee2 = (amount2 * 30) / 10000;
+
+        vm.prank(alice);
+        pool.swap(address(token1), amount1);
+
+        vm.prank(bob);
+        pool.swap(address(token1), amount2);
+
+        assertEq(pool.Qb(), (amount1 - fee1) + (amount2 - fee2));
+    }
 }
