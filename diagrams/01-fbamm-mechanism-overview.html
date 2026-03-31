@@ -1,0 +1,378 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FBAMM Mechanism Overview</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+    background: #ffffff;
+    color: #1a1a2e;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+    padding: 40px;
+  }
+  .container {
+    width: 1200px;
+    max-width: 100%;
+  }
+  h1 {
+    text-align: center;
+    font-size: 28px;
+    font-weight: 700;
+    margin-bottom: 8px;
+    color: #1a1a2e;
+  }
+  .subtitle {
+    text-align: center;
+    font-size: 15px;
+    color: #6b7280;
+    margin-bottom: 48px;
+  }
+  .comparison {
+    display: flex;
+    gap: 48px;
+    align-items: flex-start;
+    justify-content: center;
+  }
+  .panel {
+    border: 2px solid #e5e7eb;
+    border-radius: 16px;
+    padding: 32px;
+    background: #fafafa;
+    position: relative;
+  }
+  .panel-traditional { width: 340px; }
+  .panel-fbamm { width: 560px; }
+  .panel-label {
+    position: absolute;
+    top: -14px;
+    left: 24px;
+    background: #1a1a2e;
+    color: white;
+    font-size: 13px;
+    font-weight: 600;
+    padding: 4px 16px;
+    border-radius: 20px;
+    letter-spacing: 0.5px;
+  }
+  .panel-fbamm .panel-label { background: #7c3aed; }
+
+  /* Traditional AMM */
+  .trad-reserves {
+    display: flex;
+    gap: 16px;
+    justify-content: center;
+    margin: 32px 0 24px;
+  }
+  .reserve-box {
+    width: 100px;
+    height: 72px;
+    border-radius: 12px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    font-size: 22px;
+    border: 2px solid;
+  }
+  .reserve-x { background: #dcfce7; border-color: #22c55e; color: #15803d; }
+  .reserve-y { background: #dcfce7; border-color: #22c55e; color: #15803d; }
+  .reserve-label {
+    font-size: 11px;
+    font-weight: 500;
+    color: #6b7280;
+    margin-top: 2px;
+  }
+  .trad-swap {
+    text-align: center;
+    margin: 16px 0;
+  }
+  .swap-arrow {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    background: #fee2e2;
+    border: 1px solid #fca5a5;
+    border-radius: 8px;
+    padding: 8px 20px;
+    font-size: 14px;
+    font-weight: 600;
+    color: #dc2626;
+  }
+  .trad-desc {
+    text-align: center;
+    font-size: 13px;
+    color: #6b7280;
+    margin-top: 12px;
+    line-height: 1.5;
+  }
+
+  /* FBAMM */
+  .fbamm-actors {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 8px;
+    padding: 0 20px;
+  }
+  .actor {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+  }
+  .actor-icon {
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 18px;
+  }
+  .buyer .actor-icon { background: #dbeafe; border: 2px solid #3b82f6; }
+  .seller .actor-icon { background: #fee2e2; border: 2px solid #ef4444; }
+  .actor-label { font-size: 13px; font-weight: 600; }
+  .buyer .actor-label { color: #2563eb; }
+  .seller .actor-label { color: #dc2626; }
+
+  .fbamm-arrows-down {
+    display: flex;
+    justify-content: space-between;
+    padding: 0 44px;
+    margin-bottom: 4px;
+  }
+  .arrow-down {
+    font-size: 24px;
+    font-weight: 700;
+  }
+  .arrow-down.buy { color: #3b82f6; }
+  .arrow-down.sell { color: #ef4444; }
+
+  .accumulators {
+    display: flex;
+    gap: 16px;
+    justify-content: center;
+    margin-bottom: 0;
+  }
+  .accumulator {
+    flex: 1;
+    height: 64px;
+    border-radius: 12px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    font-size: 20px;
+    border: 2px solid;
+  }
+  .acc-buy { background: #dbeafe; border-color: #3b82f6; color: #1d4ed8; }
+  .acc-sell { background: #fee2e2; border-color: #ef4444; color: #dc2626; }
+  .acc-label { font-size: 11px; font-weight: 500; opacity: 0.7; margin-top: 1px; }
+
+  .barrier {
+    display: flex;
+    align-items: center;
+    margin: 16px 0;
+    gap: 12px;
+  }
+  .barrier-line {
+    flex: 1;
+    border-top: 3px dashed #9ca3af;
+  }
+  .barrier-label {
+    font-size: 12px;
+    font-weight: 600;
+    color: #6b7280;
+    white-space: nowrap;
+    background: #f3f4f6;
+    padding: 4px 12px;
+    border-radius: 12px;
+  }
+
+  .clearing-arrow {
+    text-align: center;
+    margin: 8px 0 12px;
+  }
+  .clearing-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    background: #7c3aed;
+    color: white;
+    border-radius: 8px;
+    padding: 8px 20px;
+    font-size: 13px;
+    font-weight: 600;
+  }
+  .clearing-sub {
+    text-align: center;
+    font-size: 12px;
+    color: #6b7280;
+    margin-bottom: 16px;
+  }
+
+  .fbamm-reserves {
+    display: flex;
+    gap: 16px;
+    justify-content: center;
+    margin-bottom: 16px;
+  }
+  .fbamm-reserve {
+    width: 100px;
+    height: 64px;
+    border-radius: 12px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    font-size: 20px;
+    background: #dcfce7;
+    border: 2px solid #22c55e;
+    color: #15803d;
+  }
+
+  .unified-price {
+    text-align: center;
+    background: linear-gradient(135deg, #7c3aed15, #3b82f615);
+    border: 2px solid #7c3aed;
+    border-radius: 12px;
+    padding: 12px 20px;
+    font-size: 14px;
+    font-weight: 600;
+    color: #7c3aed;
+  }
+
+  /* VS badge */
+  .vs-badge {
+    align-self: center;
+    margin-top: 60px;
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    background: #f3f4f6;
+    border: 2px solid #d1d5db;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 800;
+    font-size: 16px;
+    color: #6b7280;
+    flex-shrink: 0;
+  }
+</style>
+</head>
+<body>
+<div class="container">
+  <h1>FBAMM Mechanism Overview</h1>
+  <p class="subtitle">Extending the AMM state model from 2 to 4 variables to enable batch clearing</p>
+
+  <div class="comparison">
+    <!-- Traditional AMM -->
+    <div class="panel panel-traditional">
+      <div class="panel-label">TRADITIONAL AMM</div>
+
+      <div class="trad-reserves">
+        <div class="reserve-box reserve-x">
+          X
+          <span class="reserve-label">Reserve</span>
+        </div>
+        <div class="reserve-box reserve-y">
+          Y
+          <span class="reserve-label">Reserve</span>
+        </div>
+      </div>
+
+      <div class="trad-swap">
+        <div class="swap-arrow">
+          Swap &rarr; Updates X, Y directly
+        </div>
+      </div>
+
+      <div class="trad-desc">
+        Every trade immediately changes reserves.<br>
+        Price = ratio of X to Y.<br>
+        <strong>2 state variables.</strong>
+      </div>
+    </div>
+
+    <!-- VS -->
+    <div class="vs-badge">VS</div>
+
+    <!-- FBAMM -->
+    <div class="panel panel-fbamm">
+      <div class="panel-label">FBAMM</div>
+
+      <!-- Actors -->
+      <div class="fbamm-actors">
+        <div class="actor buyer">
+          <div class="actor-icon">B</div>
+          <span class="actor-label">Buyers</span>
+        </div>
+        <div class="actor seller">
+          <div class="actor-icon">S</div>
+          <span class="actor-label">Sellers</span>
+        </div>
+      </div>
+
+      <!-- Arrows down -->
+      <div class="fbamm-arrows-down">
+        <span class="arrow-down buy">&darr;</span>
+        <span class="arrow-down sell">&darr;</span>
+      </div>
+
+      <!-- Accumulators -->
+      <div class="accumulators">
+        <div class="accumulator acc-buy">
+          Qb
+          <span class="acc-label">Buy Quantity</span>
+        </div>
+        <div class="accumulator acc-sell">
+          Qs
+          <span class="acc-label">Sell Quantity</span>
+        </div>
+      </div>
+
+      <!-- Barrier -->
+      <div class="barrier">
+        <div class="barrier-line"></div>
+        <div class="barrier-label">Clearing Required</div>
+        <div class="barrier-line"></div>
+      </div>
+
+      <!-- Clearing action -->
+      <div class="clearing-arrow">
+        <div class="clearing-badge">
+          &darr; Clearing &darr;
+        </div>
+      </div>
+      <div class="clearing-sub">Once per block &mdash; nets Qb vs Qs, remainder updates reserves</div>
+
+      <!-- LP Reserves -->
+      <div class="fbamm-reserves">
+        <div class="fbamm-reserve">
+          X
+          <span class="reserve-label">Reserve</span>
+        </div>
+        <div class="fbamm-reserve">
+          Y
+          <span class="reserve-label">Reserve</span>
+        </div>
+      </div>
+
+      <!-- Unified Price -->
+      <div class="unified-price">
+        Unified price for all participants
+      </div>
+    </div>
+  </div>
+</div>
+</body>
+</html>

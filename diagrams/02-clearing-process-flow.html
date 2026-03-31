@@ -1,0 +1,524 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FBAMM Clearing Process Flow</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+    background: #ffffff;
+    color: #1a1a2e;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+    padding: 40px 24px;
+  }
+  .container { width: 1400px; max-width: 100%; }
+  h1 {
+    text-align: center;
+    font-size: 28px;
+    font-weight: 700;
+    margin-bottom: 8px;
+  }
+  .subtitle {
+    text-align: center;
+    font-size: 15px;
+    color: #6b7280;
+    margin-bottom: 48px;
+  }
+
+  .flow {
+    display: flex;
+    align-items: stretch;
+    gap: 0;
+  }
+
+  .step {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    position: relative;
+  }
+  .step-header {
+    text-align: center;
+    margin-bottom: 16px;
+  }
+  .step-number {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    background: #1a1a2e;
+    color: white;
+    font-size: 14px;
+    font-weight: 700;
+    margin-bottom: 8px;
+  }
+  .step.highlight .step-number { background: #7c3aed; }
+  .step-title {
+    display: block;
+    font-size: 14px;
+    font-weight: 700;
+    color: #1a1a2e;
+  }
+
+  .step-body {
+    flex: 1;
+    border: 2px solid #e5e7eb;
+    border-radius: 16px;
+    padding: 24px 16px;
+    background: #fafafa;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+  }
+  .step.highlight .step-body {
+    border-color: #7c3aed;
+    background: #7c3aed08;
+  }
+
+  /* Arrows between steps */
+  .arrow-col {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 40px;
+    flex-shrink: 0;
+    padding-top: 48px;
+  }
+  .arrow-right {
+    font-size: 28px;
+    color: #9ca3af;
+    font-weight: 700;
+  }
+
+  /* Step 1: Orders */
+  .order-group {
+    width: 100%;
+  }
+  .order-group-label {
+    font-size: 12px;
+    font-weight: 600;
+    margin-bottom: 8px;
+    text-align: center;
+  }
+  .order-group-label.buy { color: #2563eb; }
+  .order-group-label.sell { color: #dc2626; }
+
+  .order-rows {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .order-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 13px;
+    padding: 6px 10px;
+    border-radius: 8px;
+  }
+  .order-row.buy { background: #dbeafe; color: #1d4ed8; }
+  .order-row.sell { background: #fee2e2; color: #dc2626; }
+  .order-icon {
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 11px;
+    font-weight: 700;
+    flex-shrink: 0;
+  }
+  .buy .order-icon { background: #3b82f6; color: white; }
+  .sell .order-icon { background: #ef4444; color: white; }
+
+  .accumulator-bar {
+    width: 100%;
+    padding: 10px;
+    border-radius: 10px;
+    text-align: center;
+    font-weight: 700;
+    font-size: 16px;
+    border: 2px solid;
+  }
+  .acc-bar-buy { background: #dbeafe; border-color: #3b82f6; color: #1d4ed8; }
+  .acc-bar-sell { background: #fee2e2; border-color: #ef4444; color: #dc2626; }
+  .acc-sublabel { font-size: 11px; font-weight: 500; opacity: 0.7; }
+
+  /* Step 2: Trigger */
+  .trigger-icon {
+    width: 64px;
+    height: 64px;
+    border-radius: 50%;
+    background: #f3f4f6;
+    border: 3px solid #9ca3af;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 28px;
+    margin: 12px 0;
+  }
+  .trigger-label {
+    font-size: 14px;
+    font-weight: 600;
+    text-align: center;
+    color: #374151;
+  }
+  .trigger-sub {
+    font-size: 12px;
+    color: #6b7280;
+    text-align: center;
+    line-height: 1.5;
+  }
+  .trigger-badge {
+    display: inline-block;
+    background: #dcfce7;
+    border: 1px solid #22c55e;
+    border-radius: 6px;
+    padding: 4px 12px;
+    font-size: 12px;
+    font-weight: 600;
+    color: #15803d;
+    margin-top: 4px;
+  }
+
+  /* Step 3: Netting */
+  .netting-visual {
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    align-items: center;
+  }
+  .netting-bars {
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .netting-bar {
+    height: 36px;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    position: relative;
+    overflow: hidden;
+  }
+  .netting-bar-buy { border: 2px solid #3b82f6; }
+  .netting-bar-sell { border: 2px solid #ef4444; }
+  .bar-fill-matched-buy {
+    height: 100%;
+    background: repeating-linear-gradient(45deg, #93c5fd, #93c5fd 4px, #bfdbfe 4px, #bfdbfe 8px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 11px;
+    font-weight: 600;
+    color: #1e40af;
+  }
+  .bar-fill-remainder {
+    height: 100%;
+    background: #3b82f6;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 11px;
+    font-weight: 700;
+    color: white;
+  }
+  .bar-fill-matched-sell {
+    height: 100%;
+    width: 100%;
+    background: repeating-linear-gradient(45deg, #fca5a5, #fca5a5 4px, #fecaca 4px, #fecaca 8px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 11px;
+    font-weight: 600;
+    color: #991b1b;
+  }
+
+  .netting-legend {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    width: 100%;
+  }
+  .legend-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 12px;
+  }
+  .legend-swatch {
+    width: 20px;
+    height: 14px;
+    border-radius: 3px;
+    flex-shrink: 0;
+  }
+  .swatch-matched { background: repeating-linear-gradient(45deg, #93c5fd, #93c5fd 3px, #bfdbfe 3px, #bfdbfe 6px); border: 1px solid #3b82f6; }
+  .swatch-net { background: #3b82f6; }
+  .legend-text { color: #374151; font-weight: 500; }
+  .legend-highlight { color: #7c3aed; font-weight: 700; }
+
+  /* Step 4: LP */
+  .lp-box {
+    width: 100%;
+    border: 2px solid #22c55e;
+    border-radius: 12px;
+    background: #dcfce7;
+    padding: 16px;
+    text-align: center;
+  }
+  .lp-title {
+    font-size: 12px;
+    font-weight: 600;
+    color: #15803d;
+    margin-bottom: 10px;
+  }
+  .lp-transition {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    margin-bottom: 6px;
+  }
+  .lp-val {
+    font-size: 14px;
+    font-weight: 700;
+    color: #15803d;
+    background: white;
+    border-radius: 6px;
+    padding: 4px 10px;
+  }
+  .lp-arrow { color: #22c55e; font-weight: 700; font-size: 16px; }
+  .lp-note {
+    font-size: 11px;
+    color: #6b7280;
+    margin-top: 8px;
+    line-height: 1.4;
+  }
+  .bypass-badge {
+    display: inline-block;
+    background: #f3f4f6;
+    border: 1px solid #d1d5db;
+    border-radius: 6px;
+    padding: 6px 14px;
+    font-size: 13px;
+    font-weight: 600;
+    color: #374151;
+    margin-top: 8px;
+  }
+  .bypass-num { color: #7c3aed; font-weight: 800; }
+
+  /* Step 5: Unified price */
+  .price-bar {
+    width: 100%;
+    background: linear-gradient(135deg, #7c3aed15, #3b82f615);
+    border: 2px solid #7c3aed;
+    border-radius: 12px;
+    padding: 16px;
+    text-align: center;
+  }
+  .price-label {
+    font-size: 14px;
+    font-weight: 700;
+    color: #7c3aed;
+    margin-bottom: 4px;
+  }
+  .price-sub {
+    font-size: 12px;
+    color: #6b7280;
+  }
+  .participants {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    width: 100%;
+  }
+  .participant-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 12px;
+    border-radius: 8px;
+    font-size: 13px;
+    font-weight: 600;
+  }
+  .participant-row.buy { background: #dbeafe; color: #1d4ed8; }
+  .participant-row.sell { background: #fee2e2; color: #dc2626; }
+  .check { color: #22c55e; font-weight: 800; }
+  .same-price-label {
+    font-size: 11px;
+    color: #6b7280;
+    text-align: center;
+    font-style: italic;
+  }
+</style>
+</head>
+<body>
+<div class="container">
+  <h1>FBAMM Clearing Process</h1>
+  <p class="subtitle">Step-by-step: how a single clearing event works</p>
+
+  <div class="flow">
+    <!-- Step 1: Orders Accumulate -->
+    <div class="step">
+      <div class="step-header">
+        <div class="step-number">1</div>
+        <span class="step-title">Orders Accumulate</span>
+      </div>
+      <div class="step-body">
+        <div class="order-group">
+          <div class="order-group-label buy">Buyers</div>
+          <div class="order-rows">
+            <div class="order-row buy"><div class="order-icon">B</div> Alice buys 60</div>
+            <div class="order-row buy"><div class="order-icon">B</div> Bob buys 50</div>
+            <div class="order-row buy"><div class="order-icon">B</div> Carol buys 40</div>
+          </div>
+        </div>
+        <div class="order-group">
+          <div class="order-group-label sell">Sellers</div>
+          <div class="order-rows">
+            <div class="order-row sell"><div class="order-icon">S</div> Dave sells 60</div>
+            <div class="order-row sell"><div class="order-icon">S</div> Eve sells 40</div>
+          </div>
+        </div>
+        <div class="accumulator-bar acc-bar-buy">
+          Qb = 150
+          <div class="acc-sublabel">Buy Quantity</div>
+        </div>
+        <div class="accumulator-bar acc-bar-sell">
+          Qs = 100
+          <div class="acc-sublabel">Sell Quantity</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="arrow-col"><span class="arrow-right">&rarr;</span></div>
+
+    <!-- Step 2: Clearing Triggered -->
+    <div class="step">
+      <div class="step-header">
+        <div class="step-number">2</div>
+        <span class="step-title">Clearing Triggered</span>
+      </div>
+      <div class="step-body">
+        <div class="trigger-icon">&#9889;</div>
+        <div class="trigger-label">Anyone can trigger</div>
+        <div class="trigger-sub">
+          One clearing per block.<br>
+          Caller pays gas but earns transaction fees.
+        </div>
+        <div class="trigger-badge">Earns tx fee reward</div>
+        <div style="margin-top: 12px; padding: 12px; background: #f9fafb; border-radius: 10px; border: 1px solid #e5e7eb; width: 100%;">
+          <div style="font-size: 12px; color: #6b7280; text-align: center; line-height: 1.6;">
+            All pending orders<br>processed simultaneously<br>at a <strong style="color: #7c3aed;">single unified price</strong>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="arrow-col"><span class="arrow-right">&rarr;</span></div>
+
+    <!-- Step 3: Netting (highlight) -->
+    <div class="step highlight">
+      <div class="step-header">
+        <div class="step-number">3</div>
+        <span class="step-title">Netting</span>
+      </div>
+      <div class="step-body">
+        <div class="netting-visual">
+          <div style="font-size: 13px; font-weight: 600; color: #374151;">Qb = 150 vs Qs = 100</div>
+
+          <div class="netting-bars">
+            <div class="netting-bar netting-bar-buy" style="width: 100%;">
+              <div class="bar-fill-matched-buy" style="width: 66.7%;">Matched: 100</div>
+              <div class="bar-fill-remainder" style="width: 33.3%;">Net: 50</div>
+            </div>
+            <div class="netting-bar netting-bar-sell" style="width: 66.7%;">
+              <div class="bar-fill-matched-sell">Matched: 100</div>
+            </div>
+          </div>
+
+          <div class="netting-legend">
+            <div class="legend-item">
+              <div class="legend-swatch swatch-matched"></div>
+              <span class="legend-text">100 units netted &mdash; <strong>no LP needed</strong></span>
+            </div>
+            <div class="legend-item">
+              <div class="legend-swatch swatch-net"></div>
+              <span class="legend-highlight">50 units net demand &rarr; hits LP</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="arrow-col"><span class="arrow-right">&rarr;</span></div>
+
+    <!-- Step 4: LP Interaction -->
+    <div class="step">
+      <div class="step-header">
+        <div class="step-number">4</div>
+        <span class="step-title">LP Interaction</span>
+      </div>
+      <div class="step-body">
+        <div class="lp-box">
+          <div class="lp-title">LP Reserves Update</div>
+          <div class="lp-transition">
+            <span class="lp-val">X₀</span>
+            <span class="lp-arrow">&rarr;</span>
+            <span class="lp-val">X₁</span>
+          </div>
+          <div style="font-size: 11px; color: #6b7280;">X₁ = X₀ &minus; 50</div>
+          <div style="height: 8px;"></div>
+          <div class="lp-transition">
+            <span class="lp-val">Y₀</span>
+            <span class="lp-arrow">&rarr;</span>
+            <span class="lp-val">Y₁</span>
+          </div>
+          <div style="font-size: 11px; color: #6b7280;">X₁ &times; Y₁ = X₀ &times; Y₀</div>
+          <div class="lp-note">Only net 50 consumes liquidity<br>(not all 250 of volume)</div>
+        </div>
+        <div class="bypass-badge">
+          <span class="bypass-num">100</span> units settled peer-to-peer
+        </div>
+      </div>
+    </div>
+
+    <div class="arrow-col"><span class="arrow-right">&rarr;</span></div>
+
+    <!-- Step 5: Unified Price -->
+    <div class="step">
+      <div class="step-header">
+        <div class="step-number">5</div>
+        <span class="step-title">Unified Price</span>
+      </div>
+      <div class="step-body">
+        <div class="price-bar">
+          <div class="price-label">Unified Clearing Price</div>
+          <div class="price-sub">= Post-swap spot price</div>
+        </div>
+        <div class="participants">
+          <div class="participant-row buy"><span class="check">&#10003;</span> Alice (60) &mdash; same price</div>
+          <div class="participant-row buy"><span class="check">&#10003;</span> Bob (50) &mdash; same price</div>
+          <div class="participant-row buy"><span class="check">&#10003;</span> Carol (40) &mdash; same price</div>
+          <div class="participant-row sell"><span class="check">&#10003;</span> Dave (60) &mdash; same price</div>
+          <div class="participant-row sell"><span class="check">&#10003;</span> Eve (40) &mdash; same price</div>
+        </div>
+        <div class="same-price-label">No frontrunning possible &mdash;<br>everyone gets the same deal</div>
+      </div>
+    </div>
+  </div>
+</div>
+</body>
+</html>
