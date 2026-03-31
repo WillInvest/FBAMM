@@ -1,0 +1,42 @@
+{
+  "config": {
+    "num_blocks": 1000,
+    "initial_reserve0": "950432921139181460479",
+    "initial_reserve1": "2137320809623"
+  },
+  "summary": {
+    "total_blocks_with_trades": 993,
+    "multi_trade_blocks": 965,
+    "avg_trades_per_block": 5.101711983887211
+  },
+  "execution_quality": {
+    "univ2_avg_within_block_price_variance": 65.44336149118412,
+    "univ2_max_within_block_price_variance": 336.90850949153355,
+    "fbamm_within_block_price_variance": 0,
+    "univ2_avg_spread_per_block": 18.59320474994846,
+    "univ2_max_spread_per_block": 56.187622675500734,
+    "fbamm_spread_per_block": 0
+  },
+  "netting": {
+    "avg_netting_ratio": 0.40914238445917145,
+    "max_netting_ratio": 0.9995990309362504,
+    "blocks_with_both_sides": 850,
+    "blocks_with_both_sides_pct": 85.59919436052367
+  },
+  "pool_state": {
+    "univ2_final_reserve0": "950432921139181460479",
+    "univ2_final_reserve1": "2137320809623",
+    "univ2_final_k": "2031380060501548230578487857389417",
+    "fbamm_final_reserve0": "948837155566892062308",
+    "fbamm_final_reserve1": "2134279732482",
+    "fbamm_final_k": "2025083910552288207798887515488456"
+  },
+  "lp_returns": {
+    "univ2_total_fees0": "7502034125714318389",
+    "univ2_total_fees1": "16310360920",
+    "fbamm_total_lp_fees0": "6001627300571454344",
+    "fbamm_total_lp_fees1": "13048288374",
+    "fbamm_total_clearer_fees0": "1500406825142864045",
+    "fbamm_total_clearer_fees1": "3262072546"
+  }
+}
