@@ -1,0 +1,48 @@
+{
+  "config": {
+    "num_blocks": 500,
+    "initial_price": 2000.0,
+    "final_cex_price": 1354.716096881117,
+    "sigma": 0.02
+  },
+  "summary": {
+    "total_blocks_with_trades": 494,
+    "multi_trade_blocks": 486,
+    "avg_trades_per_block": 5.149797570850202
+  },
+  "execution_quality": {
+    "univ2_avg_price_variance": 33.56005804757305,
+    "univ2_max_price_variance": 179.58112682146935,
+    "univ2_avg_spread": 12.570833680546473,
+    "univ2_max_spread": 39.24517543233242,
+    "fbamm_price_variance": 0,
+    "fbamm_spread": 0
+  },
+  "netting": {
+    "avg_netting_ratio": 0.24888514611140342,
+    "max_netting_ratio": 0.996874977199321,
+    "blocks_with_both_sides": 452,
+    "blocks_with_both_sides_pct": 90.76305220883533
+  },
+  "arbitrage": {
+    "univ2_arb_blocks": 387,
+    "fbamm_arb_blocks": 404,
+    "univ2_arb_total_profit_usdc": 72211.926191,
+    "fbamm_arb_total_profit_usdc": 83857.620515
+  },
+  "lp_returns": {
+    "held_value_usdc": 3354716.096,
+    "univ2_pool_value_usdc": 3322539.595832,
+    "fbamm_pool_value_usdc": 3316945.828706,
+    "univ2_il_usdc": 32176.500168,
+    "fbamm_il_usdc": 37770.267294,
+    "univ2_fees_usdc": 30804.302748,
+    "fbamm_lp_fees_usdc": 25154.776916,
+    "univ2_net_pnl_usdc": -1372.19742,
+    "fbamm_net_pnl_usdc": -12615.490378
+  },
+  "pool_state": {
+    "univ2_reserves": "1228.25 ETH / 1658610.94 USDC",
+    "fbamm_reserves": "1223.54 ETH / 1659396.45 USDC"
+  }
+}
